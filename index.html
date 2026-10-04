@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta charset="utf-8">
+<title>塞行李箱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&family=ZCOOL+KuaiLe&display=swap">
+<style>
+/* 卧室木地板上摊着一只打开的行李箱，床单上是要带的东西。暖光、薄荷绿的箱子。外观固定，不跟系统深色走 */
+:root{
+  color-scheme:light;
+  --ink:#33302e;
+  --soft:#7a716a;
+  --mint:#5fc7a8;
+  --mint-d:#3b9c80;
+  --coral:#ff7a6b;
+  --card:#fffaf3;
+  --line:rgba(60,40,30,.14);
+  --font-title:"ZCOOL KuaiLe","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --font-num:"Baloo 2","Noto Sans SC",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{overflow:hidden;color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;touch-action:none;-webkit-user-select:none;user-select:none;background:#b98a5e}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
+#stage{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%)}
+#cv{display:block;width:100%;height:100%;touch-action:none}
+#hud{position:absolute;left:0;top:0;width:420px;height:740px;transform-origin:0 0;pointer-events:none}
+#hud > *{pointer-events:auto}
+.bar{position:absolute;left:10px;right:10px;top:10px;display:flex;align-items:center;gap:8px;pointer-events:none}
+.bar > *{pointer-events:auto}
+.chip{padding:4px 12px;border-radius:999px;background:rgba(255,250,243,.92);box-shadow:0 3px 10px rgba(60,30,10,.18);font-weight:700;font-size:14px;white-space:nowrap}
+.chip b{font-family:var(--font-num);font-size:17px}
+.grow{flex:1}
+.ibtn{width:36px;height:36px;border:0;border-radius:50%;background:rgba(255,250,243,.92);box-shadow:0 3px 10px rgba(60,30,10,.18);font-size:15px;display:grid;place-items:center}
+.tools{position:absolute;display:flex;gap:6px;transform:translate(-50%,-100%);transition:opacity .15s}
+.tools button{border:0;border-radius:999px;padding:7px 12px;background:var(--ink);color:#fff;font-weight:700;font-size:14px;box-shadow:0 6px 14px rgba(0,0,0,.25);white-space:nowrap}
+.tools button.fold{background:var(--coral)}
+.close{position:absolute;left:50%;top:0;transform:translateX(-50%);border:0;border-radius:999px;padding:11px 26px;font-weight:900;font-size:17px;background:var(--mint);color:#fff;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14),0 8px 18px rgba(40,120,100,.35);white-space:nowrap}
+.close:disabled{background:#c9c2bb;box-shadow:inset 0 -4px 0 rgba(0,0,0,.08)}
+.toast{position:absolute;left:50%;top:60px;transform:translate(-50%,-6px);opacity:0;padding:7px 16px;border-radius:999px;background:var(--ink);color:#fff;font-size:13px;font-weight:700;white-space:nowrap;transition:all .2s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+#home,#modal{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#home{background:radial-gradient(120% 80% at 50% 0%,#f3d9b8 0%,#d8a878 55%,#a8784e 100%)}
+#modal{background:rgba(50,30,20,.45)}
+.card{width:min(380px,100%);max-height:calc(100% - 16px);overflow:auto;border-radius:24px;background:var(--card);box-shadow:0 24px 60px rgba(40,20,10,.35);padding:22px 18px 18px;display:flex;flex-direction:column;gap:12px;text-align:center;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{transform:translateY(14px) scale(.95);opacity:0}}
+.logo{margin:0;font-family:var(--font-title);font-weight:400;font-size:52px;line-height:1.05;color:var(--mint-d);text-shadow:0 3px 0 #fff}
+.card h2{margin:0;font-family:var(--font-title);font-weight:400;font-size:30px}
+.card p{margin:0}
+.card .small{font-size:12px;color:var(--soft)}
+.levels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.lv{border:0;border-radius:16px;padding:10px 8px;background:#fff;box-shadow:inset 0 0 0 1.5px var(--line);text-align:center}
+.lv b{display:block;font-family:var(--font-title);font-weight:400;font-size:18px}
+.lv span{font-size:12px;color:var(--soft)}
+.lv.done{box-shadow:inset 0 0 0 2px var(--mint)}
+.lv:disabled{opacity:.45}
+.lv.daily{grid-column:1/-1;background:linear-gradient(135deg,#fff3e6,#ffe0d6)}
+.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:900;font-size:16px;background:var(--mint);color:#fff;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14),0 8px 18px rgba(40,120,100,.3)}
+.btn.ghost{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn:active{transform:translateY(2px)}
+.row{display:flex;gap:8px}
+.row > *{flex:1}
+.big{font-family:var(--font-num);font-weight:800;font-size:52px;line-height:1;color:var(--mint-d)}
+.how{margin:0;padding-left:1.2em;text-align:left;font-size:14px;display:flex;flex-direction:column;gap:5px}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <div class="bar">
+      <button class="ibtn" id="btnBack" type="button" aria-label="选关">☰</button>
+      <span class="chip" id="lvName"></span>
+      <span class="grow"></span>
+      <span class="chip">⏱ <b id="time">0:00</b></span>
+      <button class="ibtn" id="btnSound" type="button" aria-label="声音">🔊</button>
+    </div>
+    <div class="tools" id="tools" hidden><button type="button" id="tRot">↻ 转一下</button><button type="button" class="fold" id="tFold">叠起来</button></div>
+    <button class="close" id="btnClose" type="button" disabled>合上箱子</button>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+<section id="home"><div class="card" id="homeCard"></div></section>
+<div id="modal" hidden></div>
+
+<script>
+(async () => {
+'use strict';
+const $ = id => document.getElementById(id);
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+const TAU = Math.PI * 2;
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('sxl:' + k); return v == null ? d : JSON.parse(v); } catch (e){ return d; } },
+  set(k, v){ try { localStorage.setItem('sxl:' + k, JSON.stringify(v)); } catch (e){} }
+};
+function seeded(seed){ let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(s){ let h = 2166136261; for (const ch of s){ h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+let toastT = 0;
+const toast = t => { const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('show'), 1600); };
+const W = 420, H = 740;
+
+/* ================= 形状 ================= */
+const R = (w, h) => { const o = []; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) o.push([x, y]); return o; };
+const norm = cells => { const mx = Math.min(...cells.map(c => c[0])), my = Math.min(...cells.map(c => c[1])); return cells.map(([x, y]) => [x - mx, y - my]).sort((a, b) => a[1] - b[1] || a[0] - b[0]); };
+const dims = cells => [Math.max(...cells.map(c => c[0])) + 1, Math.max(...cells.map(c => c[1])) + 1];
+function rotate(cells, rot){ let c = cells; for (let k = 0; k < rot; k++){ const [, h] = dims(c); c = c.map(([x, y]) => [h - 1 - y, x]); } return norm(c); }
+
+/* ================= 东西：每样东西有一个或几个样子（摊开、叠好、卷起） ================= */
+// 把几个格子拼成一整块：只有朝外的角是圆的，格子之间没有缝
+function fill(c, cells, cs, col, r = 9){
+  const has = (x, y) => cells.some(([a, b]) => a === x && b === y);
+  c.fillStyle = col;
+  for (const [x, y] of cells){
+    const L = has(x - 1, y), Rt = has(x + 1, y), U = has(x, y - 1), D = has(x, y + 1);
+    c.beginPath();
+    c.roundRect(x * cs + (L ? 0 : 1), y * cs + (U ? 0 : 1), cs - (L ? 0 : 1) - (Rt ? 0 : 1), cs - (U ? 0 : 1) - (D ? 0 : 1), [!L && !U ? r : 0, !Rt && !U ? r : 0, !Rt && !D ? r : 0, !L && !D ? r : 0]);
+    c.fill();
+  }
+}
+function shade(c, w, h, cs, a = .18){ const g = c.createLinearGradient(0, 0, w * cs, h * cs); g.addColorStop(0, `rgba(255,255,255,${a})`); g.addColorStop(1, `rgba(0,0,0,${a * .8})`); return g; }
+function clipCells(c, cells, cs){ c.beginPath(); for (const [x, y] of cells) c.rect(x * cs, y * cs, cs, cs); c.clip(); }
+function roll(c, w, h, cs, col, stripe){
+  const L = Math.max(w, h) * cs, T = Math.min(w, h) * cs, vert = h > w;
+  c.save(); if (vert){ c.translate(w * cs, 0); c.rotate(Math.PI / 2); }
+  const g = c.createLinearGradient(0, 0, 0, T); g.addColorStop(0, col); g.addColorStop(.5, '#ffffff22'); g.addColorStop(1, col);
+  c.fillStyle = col; c.beginPath(); c.roundRect(3, 4, L - 6, T - 8, T / 2 - 4); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.22)'; c.fillRect(8, T * .28, L - 16, T * .14);
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(8, T * .66, L - 16, T * .12);
+  if (stripe){ c.strokeStyle = stripe; c.lineWidth = 3; for (let x = 14; x < L - 10; x += 14){ c.beginPath(); c.moveTo(x, 6); c.lineTo(x, T - 6); c.stroke(); } }
+  c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1.5;
+  c.beginPath(); for (let a = 0; a < 12; a += .3){ const r = 2 + a * (T / 2 - 8) / 12; const x = L - T / 2 + Math.cos(a) * r * .35, y = T / 2 + Math.sin(a) * r; a ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+  c.restore();
+}
+function folded(c, w, h, cs, col, collar){
+  fill(c, R(w, h), cs, col, 10);
+  c.fillStyle = shade(c, w, h, cs); c.beginPath(); c.roundRect(1, 1, w * cs - 2, h * cs - 2, 10); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,.14)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(8, h * cs / 2); c.lineTo(w * cs - 8, h * cs / 2); c.stroke();
+  c.beginPath(); c.moveTo(w * cs * .22, 6); c.lineTo(w * cs * .22, h * cs - 6); c.moveTo(w * cs * .78, 6); c.lineTo(w * cs * .78, h * cs - 6); c.stroke();
+  if (collar){ c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(w * cs / 2, 4, cs * .32, cs * .2, 0, 0, Math.PI); c.fill(); }
+}
+const KINDS = {
+  tshirt: {name: 'T恤', soft: true, states: [[[0, 0], [1, 0], [2, 0], [1, 1], [1, 2]], R(2, 2), R(1, 2)], stateNames: ['摊开', '叠好', '卷起'],
+    art(c, s, w, h, cs, col){
+      if (s === 1) return folded(c, w, h, cs, col, true);
+      if (s === 2) return roll(c, w, h, cs, col);
+      const cells = this.states[0];
+      fill(c, cells, cs, col, 10);
+      c.save(); clipCells(c, cells, cs); c.fillStyle = shade(c, w, h, cs); c.fillRect(0, 0, w * cs, h * cs); c.restore();
+      c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(1.5 * cs, 3, cs * .3, cs * .22, 0, 0, Math.PI); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 2; c.beginPath(); c.moveTo(cs * .3, cs * .85); c.lineTo(cs * .3, cs * .15); c.moveTo(cs * 2.7, cs * .85); c.lineTo(cs * 2.7, cs * .15); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `${cs * .5}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('♥', 1.5 * cs, 1.4 * cs);
+    }},
+  pants: {name: '裤子', soft: true, states: [R(2, 4), R(2, 2), R(1, 2)], stateNames: ['摊开', '叠好', '卷起'],
+    art(c, s, w, h, cs){
+      const col = '#4a74b5';
+      if (s === 1) return folded(c, w, h, cs, col);
+      if (s === 2) return roll(c, w, h, cs, col);
+      fill(c, R(2, 4), cs, col, 8);
+      c.fillStyle = shade(c, 2, 4, cs); c.fillRect(1, 1, 2 * cs - 2, 4 * cs - 2);
+      c.fillStyle = '#3a5f98'; c.fillRect(2, 2, 2 * cs - 4, cs * .3);
+      c.fillStyle = '#b5874a'; c.beginPath(); c.arc(cs, cs * .15, 3, 0, TAU); c.fill();
+      c.strokeStyle = '#2a4a7a'; c.lineWidth = 3; c.beginPath(); c.moveTo(cs, cs * 1.3); c.lineTo(cs, 4 * cs - 4); c.stroke();
+      c.strokeStyle = 'rgba(255,220,150,.6)'; c.lineWidth = 1; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(cs * .5, cs * .5); c.quadraticCurveTo(cs * .6, cs * .9, cs * .9, cs); c.moveTo(cs * 1.5, cs * .5); c.quadraticCurveTo(cs * 1.4, cs * .9, cs * 1.1, cs); c.stroke(); c.setLineDash([]);
+    }},
+  sweater: {name: '毛衣', soft: true, states: [R(3, 3), R(2, 2)], stateNames: ['摊开', '叠好'],
+    art(c, s, w, h, cs){
+      const col = '#e2a95c';
+      if (s === 1){ folded(c, w, h, cs, col, true); }
+      else {
+        fill(c, R(3, 3), cs, col, 10);
+        c.fillStyle = shade(c, 3, 3, cs); c.fillRect(1, 1, 3 * cs - 2, 3 * cs - 2);
+        c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(1.5 * cs, 4, cs * .4, cs * .28, 0, 0, Math.PI); c.fill();
+        c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 2; c.beginPath(); c.moveTo(cs * .9, cs * .4); c.lineTo(cs * .9, 3 * cs - 4); c.moveTo(cs * 2.1, cs * .4); c.lineTo(cs * 2.1, 3 * cs - 4); c.stroke();
+        c.fillStyle = '#c0392b'; for (let k = 0; k < 5; k++){ c.beginPath(); c.arc(cs * (.98 + k * .26), cs * 1.6, 3, 0, TAU); c.fill(); }
+      }
+      c.fillStyle = 'rgba(255,255,255,.2)'; for (let y = 6; y < h * cs; y += 7) for (let x = 6; x < w * cs; x += 7){ c.beginPath(); c.arc(x + (y % 14 ? 3 : 0), y, 1.2, 0, TAU); c.fill(); }
+    }},
+  dress: {name: '裙子', soft: true, states: [[[1, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]], R(2, 2), R(1, 2)], stateNames: ['摊开', '叠好', '卷起'],
+    art(c, s, w, h, cs){
+      const col = '#f28fb0';
+      if (s === 1) folded(c, w, h, cs, col, true);
+      else if (s === 2) roll(c, w, h, cs, col);
+      else {
+        c.fillStyle = col; c.beginPath(); c.moveTo(cs * 1.15, 3); c.lineTo(cs * 1.85, 3); c.lineTo(cs * 1.95, cs); c.lineTo(3 * cs - 3, 3 * cs - 3); c.lineTo(3, 3 * cs - 3); c.lineTo(cs * 1.05, cs); c.closePath(); c.fill();
+        c.fillStyle = shade(c, 3, 3, cs); c.fill();
+        c.fillStyle = '#d9688f'; c.fillRect(cs * 1.02, cs * .9, cs * .96, cs * .22);
+      }
+      c.save(); clipCells(c, this.states[s], cs); c.fillStyle = 'rgba(255,255,255,.65)'; for (let y = 8; y < h * cs; y += 13) for (let x = 6; x < w * cs; x += 13){ c.beginPath(); c.arc(x + (y % 26 ? 6 : 0), y, 2.2, 0, TAU); c.fill(); } c.restore();
+    }},
+  scarf: {name: '围巾', soft: true, states: [R(1, 5), R(1, 3), R(1, 1)], stateNames: ['摊开', '叠好', '卷起'],
+    art(c, s, w, h, cs){
+      if (s === 2){ c.fillStyle = '#d64545'; c.beginPath(); c.arc(cs / 2, cs / 2, cs * .42, 0, TAU); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2.5; c.beginPath(); for (let a = 0; a < 14; a += .3){ const r = 2 + a * cs * .028; a ? c.lineTo(cs / 2 + Math.cos(a) * r, cs / 2 + Math.sin(a) * r) : c.moveTo(cs / 2, cs / 2); } c.stroke(); return; }
+      c.fillStyle = '#d64545'; c.beginPath(); c.roundRect(cs * .12, 2, cs * .76, h * cs - 4, 6); c.fill();
+      c.fillStyle = '#ffffff'; for (let y = cs * .5; y < h * cs - 10; y += cs * .55) c.fillRect(cs * .12, y, cs * .76, cs * .16);
+      c.strokeStyle = '#d64545'; c.lineWidth = 2; for (let x = cs * .2; x < cs * .85; x += 5){ c.beginPath(); c.moveTo(x, h * cs - 3); c.lineTo(x, h * cs + 3); c.stroke(); }
+    }},
+  coat: {name: '外套', soft: true, states: [R(4, 3), R(3, 2)], stateNames: ['摊开', '叠好'],
+    art(c, s, w, h, cs){
+      const col = '#7a8f5a';
+      if (s === 1){ folded(c, w, h, cs, col, true); c.fillStyle = '#e8d6a0'; for (let k = 0; k < 2; k++){ c.beginPath(); c.arc(w * cs / 2, h * cs * (.3 + k * .4), 3.5, 0, TAU); c.fill(); } return; }
+      fill(c, R(4, 3), cs, col, 10);
+      c.fillStyle = shade(c, 4, 3, cs); c.fillRect(1, 1, 4 * cs - 2, 3 * cs - 2);
+      c.fillStyle = '#5f7444'; c.beginPath(); c.moveTo(cs * 1.4, 2); c.lineTo(cs * 2, cs * 1.2); c.lineTo(cs * 2.6, 2); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.2)'; c.lineWidth = 2; c.beginPath(); c.moveTo(2 * cs, cs * 1.2); c.lineTo(2 * cs, 3 * cs - 4); c.moveTo(cs * 1.1, cs * .3); c.lineTo(cs * 1.1, 3 * cs - 4); c.moveTo(cs * 2.9, cs * .3); c.lineTo(cs * 2.9, 3 * cs - 4); c.stroke();
+      c.fillStyle = '#e8d6a0'; for (let k = 0; k < 3; k++){ c.beginPath(); c.arc(2 * cs + 8, cs * (1.5 + k * .5), 3.5, 0, TAU); c.fill(); }
+    }},
+  towel: {name: '毛巾', soft: true, states: [R(2, 3), R(1, 2), R(1, 1)], stateNames: ['摊开', '叠好', '卷起'],
+    art(c, s, w, h, cs){
+      const col = '#8fd0e8';
+      if (s === 2){ c.fillStyle = col; c.beginPath(); c.arc(cs / 2, cs / 2, cs * .42, 0, TAU); c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); for (let a = 0; a < 14; a += .3){ const r = 2 + a * cs * .028; a ? c.lineTo(cs / 2 + Math.cos(a) * r, cs / 2 + Math.sin(a) * r) : c.moveTo(cs / 2, cs / 2); } c.stroke(); return; }
+      fill(c, R(w, h), cs, col, 8);
+      c.fillStyle = shade(c, w, h, cs); c.fillRect(1, 1, w * cs - 2, h * cs - 2);
+      c.fillStyle = '#ffffff'; c.fillRect(2, h * cs * .78, w * cs - 4, 6); c.fillRect(2, h * cs * .14, w * cs - 4, 4);
+      c.fillStyle = 'rgba(255,255,255,.35)'; for (let y = 5; y < h * cs; y += 5) for (let x = 5; x < w * cs; x += 5){ c.fillRect(x, y, 1.5, 1.5); }
+    }},
+  snack: {name: '零食', soft: true, states: [R(2, 2), R(2, 1)], stateNames: ['鼓鼓的', '压扁'],
+    art(c, s, w, h, cs){
+      const g = c.createLinearGradient(0, 0, w * cs, 0); g.addColorStop(0, '#ffcd38'); g.addColorStop(.5, '#fff1a0'); g.addColorStop(1, '#f2a91f');
+      c.fillStyle = g; c.beginPath(); c.roundRect(3, 3, w * cs - 6, h * cs - 6, s ? 6 : 14); c.fill();
+      c.fillStyle = '#e8492f'; c.fillRect(3, 4, w * cs - 6, 6); c.fillRect(3, h * cs - 10, w * cs - 6, 6);
+      c.fillStyle = '#e8492f'; c.font = `${cs * (s ? .42 : .6)}px "ZCOOL KuaiLe", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('薯片', w * cs / 2, h * cs / 2 + 2);
+    }},
+  socks: {name: '袜子', soft: true, states: [R(1, 1)], stateNames: ['团好'],
+    art(c, s, w, h, cs){ for (const [x, col] of [[.4, '#9b7fd6'], [.6, '#ffffff']]){ c.fillStyle = col; c.beginPath(); c.ellipse(cs * x, cs / 2, cs * .28, cs * .38, .4, 0, TAU); c.fill(); } c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1.5; c.beginPath(); c.ellipse(cs * .5, cs / 2, cs * .4, cs * .4, 0, 0, TAU); c.stroke(); }},
+  shoes: {name: '鞋', soft: false, states: [R(2, 2)],
+    art(c, s, w, h, cs){
+      for (const x of [.08, 1.04]){
+        c.fillStyle = '#fafafa'; c.beginPath(); c.roundRect(cs * x, 4, cs * .88, 2 * cs - 8, cs * .4); c.fill();
+        c.fillStyle = '#ff7a6b'; c.beginPath(); c.roundRect(cs * (x + .12), cs * .55, cs * .64, cs * 1.1, cs * .3); c.fill();
+        c.strokeStyle = '#fff'; c.lineWidth = 2; for (let k = 0; k < 4; k++){ c.beginPath(); c.moveTo(cs * (x + .2), cs * (.75 + k * .2)); c.lineTo(cs * (x + .68), cs * (.75 + k * .2)); c.stroke(); }
+        c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1.5; c.beginPath(); c.roundRect(cs * x, 4, cs * .88, 2 * cs - 8, cs * .4); c.stroke();
+      }
+    }},
+  camera: {name: '相机', soft: false, states: [R(2, 1)],
+    art(c, s, w, h, cs){ c.fillStyle = '#2f3138'; c.beginPath(); c.roundRect(3, cs * .14, 2 * cs - 6, cs * .74, 8); c.fill(); c.fillStyle = '#4a4d57'; c.fillRect(6, cs * .2, 2 * cs - 12, 6); const g = c.createRadialGradient(cs - 3, cs * .48, 2, cs, cs * .52, cs * .3); g.addColorStop(0, '#7fb8ff'); g.addColorStop(.5, '#1a2a4a'); g.addColorStop(1, '#0a0a10'); c.fillStyle = g; c.beginPath(); c.arc(cs, cs * .52, cs * .3, 0, TAU); c.fill(); c.strokeStyle = '#888'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#ff5a4a'; c.beginPath(); c.arc(cs * 1.7, cs * .32, 3, 0, TAU); c.fill(); }},
+  laptop: {name: '电脑', soft: false, states: [R(3, 2)],
+    art(c, s, w, h, cs){ const g = c.createLinearGradient(0, 0, 3 * cs, 2 * cs); g.addColorStop(0, '#e8eaee'); g.addColorStop(1, '#b8bcc6'); c.fillStyle = g; c.beginPath(); c.roundRect(3, 3, 3 * cs - 6, 2 * cs - 6, 10); c.fill(); c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1.5; c.stroke(); c.fillStyle = '#ffffff'; c.beginPath(); c.arc(1.5 * cs, cs, cs * .2, 0, TAU); c.fill(); c.fillStyle = '#5fc7a8'; c.beginPath(); c.roundRect(cs * .3, cs * .3, cs * .5, cs * .35, 4); c.fill(); c.fillStyle = '#ff7a6b'; c.beginPath(); c.arc(cs * 2.5, cs * 1.5, cs * .18, 0, TAU); c.fill(); }},
+  pouch: {name: '洗漱包', soft: false, states: [R(2, 1)],
+    art(c, s, w, h, cs){ c.fillStyle = '#7fbfa8'; c.beginPath(); c.roundRect(3, cs * .12, 2 * cs - 6, cs * .76, cs * .3); c.fill(); c.strokeStyle = '#3d7a64'; c.lineWidth = 2; c.setLineDash([2, 2]); c.beginPath(); c.moveTo(10, cs * .32); c.lineTo(2 * cs - 10, cs * .32); c.stroke(); c.setLineDash([]); c.fillStyle = '#f2c94c'; c.beginPath(); c.roundRect(2 * cs - 18, cs * .24, 8, 12, 2); c.fill(); }},
+  book: {name: '书', soft: false, states: [R(2, 2)],
+    art(c, s, w, h, cs){ c.fillStyle = '#c0583a'; c.beginPath(); c.roundRect(4, 3, 2 * cs - 8, 2 * cs - 6, 4); c.fill(); c.fillStyle = '#9a4028'; c.fillRect(4, 3, 9, 2 * cs - 6); c.fillStyle = '#fff4dc'; c.font = `${cs * .34}px "ZCOOL KuaiLe", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('旅行', cs + 4, cs * .8); c.fillText('指南', cs + 4, cs * 1.25); }},
+  umbrella: {name: '雨伞', soft: false, states: [R(1, 4)],
+    art(c, s, w, h, cs){ c.fillStyle = '#3c6fd1'; c.beginPath(); c.moveTo(cs / 2, 4); c.lineTo(cs * .78, cs * 2.9); c.lineTo(cs * .22, cs * 2.9); c.closePath(); c.fill(); c.fillStyle = '#2a55a8'; c.fillRect(cs * .22, cs * 1.6, cs * .56, 5); c.strokeStyle = '#6b4a2a'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(cs / 2, cs * 2.9); c.lineTo(cs / 2, cs * 3.55); c.arc(cs * .65, cs * 3.55, cs * .15, Math.PI, 0, true); c.stroke(); }},
+  dryer: {name: '吹风机', soft: false, states: [[[0, 0], [1, 0], [0, 1]]],
+    art(c, s, w, h, cs){ c.fillStyle = '#f29fb8'; c.beginPath(); c.roundRect(4, cs * .18, 2 * cs - 8, cs * .64, cs * .3); c.fill(); c.beginPath(); c.roundRect(cs * .2, cs * .5, cs * .5, cs * 1.4, 8); c.fill(); c.fillStyle = '#d9708f'; c.beginPath(); c.arc(2 * cs - 10, cs / 2, cs * .22, 0, TAU); c.fill(); c.fillStyle = '#555'; c.fillRect(cs * .38, cs * 1.88, 4, cs * .1); }},
+  pillow: {name: 'U形枕', soft: false, states: [[[0, 0], [2, 0], [0, 1], [1, 1], [2, 1]]],
+    art(c, s, w, h, cs){ c.strokeStyle = '#a99be0'; c.lineWidth = cs * .74; c.lineCap = 'round'; c.beginPath(); c.moveTo(cs / 2, cs * .45); c.lineTo(cs / 2, cs * 1.1); c.quadraticCurveTo(cs * 1.5, cs * 1.9, cs * 2.5, cs * 1.1); c.lineTo(cs * 2.5, cs * .45); c.stroke(); c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 3; c.beginPath(); c.moveTo(cs * .35, cs * .4); c.lineTo(cs * .35, cs * 1); c.stroke(); }},
+  bottle: {name: '保温杯', soft: false, states: [R(1, 2)],
+    art(c, s, w, h, cs){ const g = c.createLinearGradient(0, 0, cs, 0); g.addColorStop(0, '#2e9c88'); g.addColorStop(.5, '#7fe0c8'); g.addColorStop(1, '#22806e'); c.fillStyle = g; c.beginPath(); c.roundRect(cs * .2, cs * .25, cs * .6, cs * 1.65, 10); c.fill(); c.fillStyle = '#3a3a3a'; c.beginPath(); c.roundRect(cs * .24, cs * .06, cs * .52, cs * .3, 5); c.fill(); }},
+  gift: {name: '年货', soft: false, states: [R(2, 2)],
+    art(c, s, w, h, cs){ c.fillStyle = '#d63a2f'; c.beginPath(); c.roundRect(3, 3, 2 * cs - 6, 2 * cs - 6, 6); c.fill(); c.fillStyle = '#f2c94c'; c.fillRect(cs - 5, 3, 10, 2 * cs - 6); c.fillRect(3, cs - 5, 2 * cs - 6, 10); c.fillStyle = '#fff4c0'; c.font = `${cs * .5}px "ZCOOL KuaiLe", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.save(); c.translate(cs * .5, cs * .5); c.rotate(.785); c.fillText('福', 0, 2); c.restore(); }},
+  glasses: {name: '墨镜', soft: false, states: [R(2, 1)],
+    art(c, s, w, h, cs){ c.fillStyle = '#2b2b30'; for (const x of [.55, 1.45]){ c.beginPath(); c.ellipse(cs * x, cs / 2, cs * .36, cs * .28, 0, 0, TAU); c.fill(); } c.strokeStyle = '#2b2b30'; c.lineWidth = 3; c.beginPath(); c.moveTo(cs * .9, cs * .45); c.quadraticCurveTo(cs, cs * .35, cs * 1.1, cs * .45); c.stroke(); c.fillStyle = 'rgba(255,255,255,.3)'; c.beginPath(); c.ellipse(cs * .45, cs * .4, cs * .1, cs * .05, -.5, 0, TAU); c.fill(); }},
+  power: {name: '充电宝', soft: false, states: [R(1, 1)],
+    art(c, s, w, h, cs){ c.fillStyle = '#f4f4f6'; c.beginPath(); c.roundRect(cs * .14, cs * .18, cs * .72, cs * .64, 6); c.fill(); c.strokeStyle = 'rgba(0,0,0,.15)'; c.lineWidth = 1.5; c.stroke(); c.fillStyle = '#5fc7a8'; c.font = `${cs * .4}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('⚡', cs / 2, cs / 2 + 1); }}
+};
+const SHIRT_COLORS = ['#ff9f9f', '#9fd0ff', '#ffe08a', '#b8e6a0', '#d3b8ff'];
+
+/* ================= 关卡：先拼出一个刚好装满的摆法，再把衣服摊开打乱 ================= */
+const LEVELS = [
+  {name: '周末出游', cols: 5, rows: 6, cat: false},
+  {name: '出差三天', cols: 6, rows: 6, cat: false},
+  {name: '海边度假', cols: 6, rows: 7, cat: true},
+  {name: '回老家过年', cols: 6, rows: 8, cat: true, gift: true},
+  {name: '毕业旅行', cols: 7, rows: 8, cat: true},
+  {name: '搬家', cols: 7, rows: 9, cat: true}
+];
+function generate(seed, cols, rows, opts = {}){
+  for (let attempt = 0; attempt < 60; attempt++){
+    const rnd = seeded(seed + attempt * 7919);
+    const grid = Array.from({length: rows}, () => Array(cols).fill(-1));
+    const placed = [];
+    // 候选：每种东西的每个样子、每个方向
+    const kinds = Object.keys(KINDS).filter(k => k !== 'gift' || opts.gift);
+    const cand = [];
+    for (const k of kinds){
+      const K = KINDS[k];
+      K.states.forEach((cells, s) => {
+        if (K.soft && K.states.length > 1 && s === 0) return;   // 衣服在答案里都是叠过或卷过的
+        for (let rot = 0; rot < 4; rot++){ const sh = rotate(cells, rot); if (cand.some(o => o.k === k && o.s === s && JSON.stringify(o.cells) === JSON.stringify(sh))) continue; cand.push({k, s, rot, cells: sh}); }
+      });
+    }
+    let fail = false, steps = 0;
+    const used = {};
+    const fits = (sh, ox, oy) => sh.every(([x, y]) => { const gx = ox + x, gy = oy + y; return gx >= 0 && gy >= 0 && gx < cols && gy < rows && grid[gy][gx] < 0; });
+    function solve(){
+      if (++steps > 4000) return false;
+      let fx = -1, fy = -1;
+      outer: for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (grid[y][x] < 0){ fx = x; fy = y; break outer; }
+      if (fx < 0) return true;
+      const order = cand.map(o => ({o, w: rnd() * (o.cells.length >= 3 ? 2.2 : o.cells.length === 2 ? 1.2 : .35) / (1 + (used[o.k] || 0) * 1.5)})).sort((a, b) => b.w - a.w);
+      for (const {o} of order){
+        const [ax, ay] = o.cells[0];
+        const ox = fx - ax, oy = fy - ay;
+        if (!fits(o.cells, ox, oy)) continue;
+        const id = placed.length;
+        for (const [x, y] of o.cells) grid[oy + y][ox + x] = id;
+        placed.push({...o, gx: ox, gy: oy});
+        used[o.k] = (used[o.k] || 0) + 1;
+        if (solve()) return true;
+        placed.pop(); used[o.k]--;
+        for (const [x, y] of o.cells) grid[oy + y][ox + x] = -1;
+      }
+      return false;
+    }
+    if (!solve()) continue;
+    const softN = placed.filter(p => KINDS[p.k].soft && KINDS[p.k].states.length > 1).length;
+    if (softN < Math.min(3, placed.length / 3)) continue;
+    if (opts.gift && !placed.some(p => p.k === 'gift')) continue;
+    // 出题：衣服都摊开，所有东西随机转个方向
+    return placed.map((p, i) => ({id: i, k: p.k, s: KINDS[p.k].soft && KINDS[p.k].states.length > 1 ? 0 : p.s, rot: Math.floor(rnd() * 4), col: SHIRT_COLORS[Math.floor(rnd() * SHIRT_COLORS.length)], place: null, sol: {s: p.s, rot: p.rot, gx: p.gx, gy: p.gy}}));
+  }
+  return null;
+}
+
+/* ================= 画面 ================= */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let S = 1, SCALE = 1, bg = null;
+let G = null;
+const CASE = {x: 0, y: 0, w: 0, h: 0, cs: 48};
+const BED = {x: 10, y: 0, w: 400, h: 0, cs: 24};
+function layout(){
+  SCALE = Math.min(innerWidth / W, innerHeight / H);
+  const d = Math.min(devicePixelRatio || 1, 2.5);
+  S = SCALE * d;
+  const st = $('stage');
+  st.style.width = W * SCALE + 'px'; st.style.height = H * SCALE + 'px';
+  cv.width = Math.round(W * S); cv.height = Math.round(H * S);
+  $('hud').style.transform = `scale(${SCALE})`;
+  if (G) fitBoard();
+  drawBg();
+}
+addEventListener('resize', layout);
+function fitBoard(){
+  const cs = Math.floor(Math.min(330 / G.cols, 350 / G.rows));
+  CASE.cs = cs; CASE.w = cs * G.cols; CASE.h = cs * G.rows;
+  CASE.x = Math.round((W - CASE.w) / 2); CASE.y = 92;
+  BED.y = CASE.y + CASE.h + 70; BED.h = H - BED.y - 10;
+  BED.cs = Math.min(26, Math.floor(CASE.cs * .55));
+  $('btnClose').style.top = (CASE.y + CASE.h + 16) + 'px';
+  layoutBed();
+}
+function drawBg(){
+  bg = document.createElement('canvas'); bg.width = cv.width; bg.height = cv.height;
+  const c = bg.getContext('2d'); c.scale(S, S);
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#d9a874'); g.addColorStop(1, '#b8875a'); c.fillStyle = g; c.fillRect(0, 0, W, H);
+  const r = seeded(5);
+  for (let y = 0; y < H; y += 46){ c.fillStyle = 'rgba(90,50,20,.15)'; c.fillRect(0, y, W, 2); for (let x = (y / 46 % 2) * 70; x < W; x += 140){ c.fillRect(x, y, 2, 46); } for (let k = 0; k < 3; k++){ c.strokeStyle = `rgba(120,70,30,${.06 + r() * .06})`; c.lineWidth = 1; c.beginPath(); c.moveTo(0, y + 10 + k * 11); c.bezierCurveTo(140, y + 8 + k * 11 + r() * 6, 280, y + 12 + k * 11, W, y + 10 + k * 11); c.stroke(); } }
+  const lg = c.createRadialGradient(330, 60, 10, 330, 60, 380); lg.addColorStop(0, 'rgba(255,240,200,.35)'); lg.addColorStop(1, 'rgba(255,240,200,0)'); c.fillStyle = lg; c.fillRect(0, 0, W, H);
+  if (!G) return;
+  // 床单
+  c.fillStyle = 'rgba(60,30,10,.2)'; c.beginPath(); c.roundRect(BED.x + 4, BED.y + 8, BED.w, BED.h, 20); c.fill();
+  c.fillStyle = '#f6efe6'; c.beginPath(); c.roundRect(BED.x, BED.y, BED.w, BED.h, 20); c.fill();
+  c.save(); c.beginPath(); c.roundRect(BED.x, BED.y, BED.w, BED.h, 20); c.clip();
+  c.strokeStyle = 'rgba(120,170,200,.25)'; c.lineWidth = 6; for (let x = -BED.h; x < BED.w; x += 34){ c.beginPath(); c.moveTo(BED.x + x, BED.y); c.lineTo(BED.x + x + BED.h, BED.y + BED.h); c.stroke(); }
+  c.restore();
+  c.fillStyle = 'rgba(120,90,60,.55)'; c.font = '700 12px "Noto Sans SC", sans-serif'; c.textAlign = 'left'; c.fillText('床上：要带走的东西', BED.x + 14, BED.y + 18);
+  // 行李箱
+  const pad = 16;
+  c.fillStyle = 'rgba(40,20,10,.28)'; c.beginPath(); c.roundRect(CASE.x - pad + 6, CASE.y - pad + 10, CASE.w + pad * 2, CASE.h + pad * 2, 26); c.fill();
+  const gc = c.createLinearGradient(CASE.x, CASE.y, CASE.x + CASE.w, CASE.y + CASE.h); gc.addColorStop(0, '#7fdcc0'); gc.addColorStop(1, '#3b9c80');
+  c.fillStyle = gc; c.beginPath(); c.roundRect(CASE.x - pad, CASE.y - pad, CASE.w + pad * 2, CASE.h + pad * 2, 26); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2; c.beginPath(); c.roundRect(CASE.x - pad + 5, CASE.y - pad + 5, CASE.w + pad * 2 - 10, CASE.h + pad * 2 - 10, 22); c.stroke();
+  c.fillStyle = '#c9c2b8'; for (let x = CASE.x - 4; x < CASE.x + CASE.w + 4; x += 6){ c.fillRect(x, CASE.y - 9, 3, 4); c.fillRect(x, CASE.y + CASE.h + 5, 3, 4); }
+  c.fillStyle = '#2f6b5a'; c.beginPath(); c.roundRect(CASE.x + CASE.w / 2 - 34, CASE.y - pad - 14, 68, 16, 8); c.fill();
+  const gl = c.createLinearGradient(0, CASE.y, 0, CASE.y + CASE.h); gl.addColorStop(0, '#f4ead8'); gl.addColorStop(1, '#e6d6bc');
+  c.fillStyle = gl; c.beginPath(); c.roundRect(CASE.x - 3, CASE.y - 3, CASE.w + 6, CASE.h + 6, 12); c.fill();
+  c.save(); c.beginPath(); c.rect(CASE.x, CASE.y, CASE.w, CASE.h); c.clip();
+  c.strokeStyle = 'rgba(160,130,90,.18)'; c.lineWidth = 1; for (let k = -CASE.h; k < CASE.w + CASE.h; k += 18){ c.beginPath(); c.moveTo(CASE.x + k, CASE.y); c.lineTo(CASE.x + k - CASE.h, CASE.y + CASE.h); c.stroke(); c.beginPath(); c.moveTo(CASE.x + k, CASE.y); c.lineTo(CASE.x + k + CASE.h, CASE.y + CASE.h); c.stroke(); }
+  c.restore();
+  c.setLineDash([3, 4]); c.strokeStyle = 'rgba(120,90,60,.22)'; c.lineWidth = 1;
+  for (let x = 1; x < G.cols; x++){ c.beginPath(); c.moveTo(CASE.x + x * CASE.cs, CASE.y); c.lineTo(CASE.x + x * CASE.cs, CASE.y + CASE.h); c.stroke(); }
+  for (let y = 1; y < G.rows; y++){ c.beginPath(); c.moveTo(CASE.x, CASE.y + y * CASE.cs); c.lineTo(CASE.x + CASE.w, CASE.y + y * CASE.cs); c.stroke(); }
+  c.setLineDash([]);
+}
+const itemCells = it => rotate(KINDS[it.k].states[it.s], it.rot);
+function drawItem(c, it, x, y, cs, alpha = 1){
+  const base = KINDS[it.k].states[it.s], [w0, h0] = dims(base);
+  c.save(); c.globalAlpha = alpha; c.translate(x, y);
+  if (it.rot === 1){ c.translate(h0 * cs, 0); c.rotate(Math.PI / 2); }
+  else if (it.rot === 2){ c.translate(w0 * cs, h0 * cs); c.rotate(Math.PI); }
+  else if (it.rot === 3){ c.translate(0, w0 * cs); c.rotate(-Math.PI / 2); }
+  c.shadowColor = 'rgba(40,20,10,.25)'; c.shadowBlur = 6; c.shadowOffsetY = 2;
+  KINDS[it.k].art(c, it.s, w0, h0, cs, it.col);
+  c.restore();
+}
+// 床上的东西排成几行；放不下就整体缩小一点
+function layoutBed(){
+  if (!G) return;
+  const pad = 10, list = G.items.filter(it => !it.place).sort((a, b) => dims(itemCells(b))[1] - dims(itemCells(a))[1]);
+  for (let cs = BED.cs; cs >= 12; cs--){
+    let x = BED.x + pad, y = BED.y + 26, rowH = 0, ok = true;
+    for (const it of list){
+      const [w, h] = dims(itemCells(it));
+      if (x + w * cs > BED.x + BED.w - pad){ x = BED.x + pad; y += rowH + 8; rowH = 0; }
+      it.bed = {x, y, cs};
+      x += w * cs + 10; rowH = Math.max(rowH, h * cs);
+    }
+    if (y + rowH <= BED.y + BED.h - 8){ ok = true; break; }
+  }
+}
+function draw(now){
+  const c = ctx;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (bg) c.drawImage(bg, 0, 0);
+  c.setTransform(S, 0, 0, S, 0, 0);
+  if (!G) return;
+  for (const it of G.items) if (it.place && it !== G.drag?.it) drawItem(c, it, CASE.x + it.place.gx * CASE.cs, CASE.y + it.place.gy * CASE.cs, CASE.cs);
+  if (G.cat && G.cat.in) drawCat(c, CASE.x + G.cat.gx * CASE.cs, CASE.y + G.cat.gy * CASE.cs, CASE.cs, now);
+  for (const it of G.items) if (!it.place && it !== G.drag?.it && it.bed) drawItem(c, it, it.bed.x, it.bed.y, it.bed.cs);
+  if (G.cat && !G.cat.in && G.cat.show) drawCat(c, W - 70, BED.y - 46, 26, now, true);
+  // 选中的东西描一圈
+  if (G.sel && !G.drag){
+    const r = itemRect(G.sel);
+    if (r){ c.strokeStyle = '#ff7a6b'; c.lineWidth = 3; c.setLineDash([6, 4]); c.beginPath(); c.roundRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8, 10); c.stroke(); c.setLineDash([]); }
+  }
+  // 拖着走
+  if (G.drag && G.drag.moved){
+    const d = G.drag, it = d.it, cs = CASE.cs;
+    const cells = itemCells(it), [w, h] = dims(cells);
+    const x = d.px - d.ox * cs, y = d.py - d.oy * cs;
+    const gx = Math.round((x - CASE.x) / cs), gy = Math.round((y - CASE.y) / cs);
+    d.target = null;
+    if (x > CASE.x - cs * .6 && y > CASE.y - cs * .6 && x + w * cs < CASE.x + CASE.w + cs * .6 && y + h * cs < CASE.y + CASE.h + cs * .6){
+      const ok = canPlace(it, cells, gx, gy);
+      d.target = {gx, gy, ok};
+      c.fillStyle = ok ? 'rgba(95,199,168,.35)' : 'rgba(255,122,107,.35)';
+      for (const [cx, cy] of cells){ const X = gx + cx, Y = gy + cy; if (X >= 0 && Y >= 0 && X < G.cols && Y < G.rows){ c.beginPath(); c.roundRect(CASE.x + X * cs + 2, CASE.y + Y * cs + 2, cs - 4, cs - 4, 8); c.fill(); } }
+    }
+    drawItem(c, it, x, y - 6, cs, .92);
+  }
+  // 合上箱盖的动画
+  if (G.closing){
+    const u = Math.min(1, (now - G.closing) / 700), e = 1 - Math.pow(1 - u, 3), pad = 16;
+    const hh = (CASE.h + pad * 2) * e;
+    const gc = c.createLinearGradient(0, CASE.y - pad, 0, CASE.y - pad + hh); gc.addColorStop(0, '#5fc7a8'); gc.addColorStop(1, '#2f8a70');
+    c.fillStyle = gc; c.beginPath(); c.roundRect(CASE.x - pad, CASE.y - pad, CASE.w + pad * 2, Math.max(1, hh), 26); c.fill();
+    if (u >= 1){
+      const L = CASE.x - pad, T = CASE.y - pad, LW = CASE.w + pad * 2, LH = CASE.h + pad * 2;
+      // 硬壳上的竖棱
+      for (let k = 1; k <= 3; k++){
+        const x = L + LW * k / 4;
+        c.fillStyle = 'rgba(255,255,255,.13)'; c.fillRect(x - 7, T + 22, 5, LH - 44);
+        c.fillStyle = 'rgba(0,0,0,.08)'; c.fillRect(x - 2, T + 22, 4, LH - 44);
+      }
+      c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 3; c.beginPath(); c.roundRect(L + 8, T + 8, LW - 16, LH - 16, 20); c.stroke();
+      // 贴纸：太阳、爱心、星星
+      const sticker = (x, y, r, rot, bgc, f) => { c.save(); c.translate(x, y); c.rotate(rot); c.shadowColor = 'rgba(0,0,0,.18)'; c.shadowBlur = 6; c.shadowOffsetY = 2; c.fillStyle = '#fffaf2'; c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fill(); c.shadowColor = 'transparent'; c.fillStyle = bgc; c.beginPath(); c.arc(0, 0, r - 4, 0, TAU); c.fill(); f(r - 4); c.restore(); };
+      sticker(L + LW * .22, T + LH * .2, 24, -.25, '#ffd54f', r => { c.fillStyle = '#ff9f43'; c.beginPath(); c.arc(0, 0, r * .42, 0, TAU); c.fill(); c.strokeStyle = '#ff9f43'; c.lineWidth = 3; c.lineCap = 'round'; for (let k = 0; k < 8; k++){ const a = k * TAU / 8; c.beginPath(); c.moveTo(Math.cos(a) * r * .6, Math.sin(a) * r * .6); c.lineTo(Math.cos(a) * r * .82, Math.sin(a) * r * .82); c.stroke(); } });
+      sticker(L + LW * .8, T + LH * .74, 21, .3, '#ff7a6b', r => { c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, r * .55); c.bezierCurveTo(-r * .95, -r * .05, -r * .45, -r * .75, 0, -r * .25); c.bezierCurveTo(r * .45, -r * .75, r * .95, -r * .05, 0, r * .55); c.fill(); });
+      sticker(L + LW * .74, T + LH * .17, 17, .5, '#7c9cff', r => { c.fillStyle = '#fff'; c.beginPath(); for (let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? r * .32 : r * .72; c.lineTo(Math.cos(a) * q, Math.sin(a) * q); } c.closePath(); c.fill(); });
+      // 中间挂一枚行李牌
+      const tw = Math.min(150, CASE.w * .56), th = tw * .5, tx = W / 2, ty = CASE.y + CASE.h / 2;
+      c.save(); c.translate(tx, ty); c.rotate(-.06);
+      c.strokeStyle = '#3b6b5c'; c.lineWidth = 3; c.beginPath(); c.moveTo(-tw / 2 + 14, 0); c.quadraticCurveTo(-tw / 2 - 10, -th * .9, -tw / 2 - 26, -th * .7); c.stroke();
+      c.shadowColor = 'rgba(0,0,0,.22)'; c.shadowBlur = 10; c.shadowOffsetY = 4;
+      c.fillStyle = '#fff7e8'; c.beginPath(); c.roundRect(-tw / 2, -th / 2, tw, th, 12); c.fill();
+      c.shadowColor = 'transparent';
+      c.fillStyle = '#5fc7a8'; c.beginPath(); c.arc(-tw / 2 + 14, 0, 5, 0, TAU); c.fill();
+      c.fillStyle = '#ff7a6b'; c.fillRect(-tw / 2 + 28, -th / 2, 6, th);
+      c.fillStyle = '#2f4f45'; c.font = `${Math.round(th * .46)}px "ZCOOL KuaiLe", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('出发！', 16, 2);
+      c.restore();
+    }
+  }
+  for (const p of G.fx){ c.save(); c.globalAlpha = Math.min(1, p.life * 2); c.translate(p.x, p.y); c.rotate(p.r); c.fillStyle = p.c; c.fillRect(-4, -2, 8, 4); c.restore(); }
+}
+function drawCat(c, x, y, cs, now, small){
+  const t = now / 1000, s = cs * 2;
+  c.save(); c.translate(x + s / 2, y + s / 2);
+  const breathe = 1 + Math.sin(t * 2) * .02; c.scale(breathe, breathe);
+  c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(2, 4, s * .44, s * .4, 0, 0, TAU); c.fill();
+  c.fillStyle = '#f2a65a'; c.beginPath(); c.ellipse(0, 0, s * .42, s * .38, 0, 0, TAU); c.fill();
+  c.strokeStyle = '#d9843a'; c.lineWidth = s * .05; for (let k = -1; k <= 1; k++){ c.beginPath(); c.arc(0, 0, s * (.24 + k * .06), -1.2 + k * .2, -.4 + k * .2); c.stroke(); }
+  c.strokeStyle = '#f2a65a'; c.lineWidth = s * .1; c.lineCap = 'round'; c.beginPath(); c.arc(0, 0, s * .4, .3, 1.6 + Math.sin(t * 3) * .15); c.stroke();
+  c.fillStyle = '#f2a65a'; c.beginPath(); c.arc(-s * .12, -s * .1, s * .2, 0, TAU); c.fill();
+  for (const sx of [-1, 1]){ c.beginPath(); c.moveTo(-s * .12 + sx * s * .16, -s * .22); c.lineTo(-s * .12 + sx * s * .1, -s * .38); c.lineTo(-s * .12 + sx * s * .02, -s * .26); c.fill(); }
+  c.strokeStyle = '#4a2a1a'; c.lineWidth = 1.6;
+  for (const sx of [-1, 1]){ c.beginPath(); c.arc(-s * .12 + sx * s * .07, -s * .1, s * .035, .2, Math.PI - .2); c.stroke(); }
+  c.fillStyle = '#ff9fb0'; c.beginPath(); c.arc(-s * .12, -s * .05, s * .02, 0, TAU); c.fill();
+  if (!small){ c.fillStyle = '#4a2a1a'; c.font = `${s * .16}px "ZCOOL KuaiLe", sans-serif`; c.textAlign = 'center'; c.fillText('zzz', s * .26, -s * .3 - Math.sin(t * 2) * 3); }
+  c.restore();
+}
+
+/* ================= 规则 ================= */
+function occupied(except){
+  const g = Array.from({length: G.rows}, () => Array(G.cols).fill(null));
+  for (const it of G.items) if (it.place && it !== except) for (const [x, y] of itemCells(it)) g[it.place.gy + y][it.place.gx + x] = it;
+  if (G.cat && G.cat.in) for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++){ const X = G.cat.gx + x, Y = G.cat.gy + y; if (X < G.cols && Y < G.rows) g[Y][X] = 'cat'; }
+  return g;
+}
+function canPlace(it, cells, gx, gy){
+  const g = occupied(it);
+  return cells.every(([x, y]) => { const X = gx + x, Y = gy + y; return X >= 0 && Y >= 0 && X < G.cols && Y < G.rows && !g[Y][X]; });
+}
+function itemRect(it){
+  const [w, h] = dims(itemCells(it));
+  if (it.place) return {x: CASE.x + it.place.gx * CASE.cs, y: CASE.y + it.place.gy * CASE.cs, w: w * CASE.cs, h: h * CASE.cs};
+  if (it.bed) return {x: it.bed.x, y: it.bed.y, w: w * it.bed.cs, h: h * it.bed.cs};
+  return null;
+}
+function hit(px, py){
+  if (G.cat && G.cat.in){ const x = CASE.x + G.cat.gx * CASE.cs, y = CASE.y + G.cat.gy * CASE.cs; if (px > x && py > y && px < x + CASE.cs * 2 && py < y + CASE.cs * 2) return 'cat'; }
+  for (let i = G.items.length - 1; i >= 0; i--){
+    const it = G.items[i], r = itemRect(it);
+    if (!r || px < r.x || py < r.y || px > r.x + r.w || py > r.y + r.h) continue;
+    const cs = it.place ? CASE.cs : it.bed.cs, cx = Math.floor((px - r.x) / cs), cy = Math.floor((py - r.y) / cs);
+    if (itemCells(it).some(([x, y]) => x === cx && y === cy)) return it;
+  }
+  return null;
+}
+function updateUi(){
+  const left = G.items.filter(it => !it.place).length;
+  const b = $('btnClose');
+  b.disabled = left > 0 || G.done;
+  b.textContent = left > 0 ? `床上还有 ${left} 件` : '合上箱子';
+  const tools = $('tools');
+  if (G.sel && !G.drag && !G.done){
+    const r = itemRect(G.sel), K = KINDS[G.sel.k];
+    tools.hidden = false;
+    tools.style.left = Math.min(W - 90, Math.max(90, r.x + r.w / 2)) + 'px';
+    tools.style.top = Math.max(96, r.y - 10) + 'px';
+    const f = $('tFold');
+    f.hidden = !(K.soft && K.states.length > 1);
+    if (!f.hidden){ const nx = (G.sel.s + 1) % K.states.length; f.textContent = K.stateNames[nx] === '摊开' ? '摊开' : K.stateNames[nx] === '压扁' ? '压扁' : K.stateNames[nx] === '卷起' ? '卷起来' : '叠起来'; }
+  } else tools.hidden = true;
+}
+// 转和叠：在箱子里的东西变了形状放不下，就退回床上
+function transform(fn){
+  const it = G.sel; if (!it) return;
+  const before = {s: it.s, rot: it.rot};
+  fn(it);
+  if (it.place && !canPlace(it, itemCells(it), it.place.gx, it.place.gy)){ it.place = null; toast('这里放不下了，先放回床上'); }
+  G.moves++;
+  layoutBed();
+  Sound.fold();
+  updateUi();
+}
+$('tRot').addEventListener('click', () => transform(it => { it.rot = (it.rot + 1) % 4; }));
+$('tFold').addEventListener('click', () => transform(it => { it.s = (it.s + 1) % KINDS[it.k].states.length; }));
+
+/* ================= 操作 ================= */
+const P = e => { const r = cv.getBoundingClientRect(); return {x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H}; };
+cv.addEventListener('pointerdown', e => {
+  if (!G || G.done) return;
+  Sound.unlock();
+  const p = P(e), h = hit(p.x, p.y);
+  if (h === 'cat'){ shoo(); return; }
+  if (!h){ G.sel = null; updateUi(); return; }
+  cv.setPointerCapture(e.pointerId);
+  const r = itemRect(h), cs = h.place ? CASE.cs : h.bed.cs;
+  G.drag = {it: h, sx: p.x, sy: p.y, px: p.x, py: p.y, ox: (p.x - r.x) / cs, oy: (p.y - r.y) / cs, moved: false};
+  updateUi();
+});
+cv.addEventListener('pointermove', e => {
+  if (!G || !G.drag) return;
+  const p = P(e), d = G.drag;
+  d.px = p.x; d.py = p.y;
+  if (!d.moved && Math.hypot(p.x - d.sx, p.y - d.sy) > 7){ d.moved = true; G.sel = null; Sound.pick(); updateUi(); }
+});
+cv.addEventListener('pointerup', () => {
+  if (!G || !G.drag) return;
+  const d = G.drag, it = d.it;
+  G.drag = null;
+  if (!d.moved){ G.sel = G.sel === it ? null : it; updateUi(); return; }
+  if (d.target && d.target.ok){ it.place = {gx: d.target.gx, gy: d.target.gy}; G.moves++; Sound.drop(); }
+  else if (d.py > BED.y - 20){ it.place = null; Sound.drop(); }
+  else { Sound.nope(); toast(d.target ? '这里放不下' : '放到箱子里，或者放回床上'); }
+  layoutBed();
+  G.sel = it;
+  updateUi();
+});
+cv.addEventListener('pointercancel', () => { if (G) G.drag = null; });
+function shoo(){ if (!G.cat) return; G.cat.in = false; G.cat.show = true; G.cat.next = G.t + 25 + Math.random() * 15; Sound.meow(); toast('猫被你请出去了'); updateUi(); }
+function catTick(){
+  if (!G.cat || G.done) return;
+  if (!G.cat.in && G.t > G.cat.next){
+    const g = occupied(null), spots = [];
+    for (let y = 0; y < G.rows - 1; y++) for (let x = 0; x < G.cols - 1; x++) if (!g[y][x] && !g[y][x + 1] && !g[y + 1][x] && !g[y + 1][x + 1]) spots.push([x, y]);
+    if (spots.length){ const [x, y] = spots[Math.floor(Math.random() * spots.length)]; G.cat.gx = x; G.cat.gy = y; G.cat.in = true; G.cat.show = false; Sound.meow(); toast('猫跳进箱子里睡觉了，点它让它出去'); }
+    else G.cat.next = G.t + 6;
+  }
+}
+
+/* ================= 一关 ================= */
+function startLevel(spec, seed, key){
+  G = {spec, key, cols: spec.cols, rows: spec.rows, items: generate(seed, spec.cols, spec.rows, spec), t: 0, moves: 0, sel: null, drag: null, done: false, closing: 0, fx: [], cat: spec.cat ? {in: false, show: true, next: 14 + Math.random() * 8, gx: 0, gy: 0} : null};
+  if (!G.items){ toast('这一关没生成出来，换一个'); return; }
+  $('home').hidden = true;
+  closeModal();
+  $('lvName').textContent = spec.name;
+  layout();
+  updateUi();
+}
+$('btnClose').addEventListener('click', () => {
+  if (!G || G.done || G.items.some(it => !it.place)) return;
+  if (G.cat && G.cat.in){ toast('猫还在箱子里！先点它'); Sound.meow(); return; }
+  G.done = true; G.sel = null; updateUi();
+  G.closing = performance.now();
+  Sound.zip();
+  setTimeout(win, 1300);
+});
+function win(){
+  for (let k = 0; k < 50; k++) G.fx.push({x: W / 2 + (Math.random() - .5) * 200, y: CASE.y + CASE.h / 2, vx: (Math.random() - .5) * 300, vy: -200 - Math.random() * 200, life: 1.4, c: ['#5fc7a8', '#ff7a6b', '#ffd54f', '#fff'][k % 4], r: Math.random() * TAU});
+  Sound.win();
+  const sec = Math.round(G.t);
+  const rec = store.get('rec:' + G.key, null);
+  const best = rec ? Math.min(rec, sec) : sec;
+  store.set('rec:' + G.key, best);
+  const card = el('div', 'card');
+  card.append(el('h2', '', '装下了！'), el('div', 'big', fmt(sec)), el('p', 'small', `${G.spec.name} · ${G.items.length} 件东西 · 动了 ${G.moves} 次 · 最快 ${fmt(best)}`));
+  const row = el('div', 'row');
+  const idx = LEVELS.indexOf(G.spec);
+  if (idx >= 0 && idx < LEVELS.length - 1){ const n = el('button', 'btn', '下一关'); n.type = 'button'; n.addEventListener('click', () => startLevel(LEVELS[idx + 1], 1000 + idx + 1, 'lv' + (idx + 1))); row.appendChild(n); }
+  const back = el('button', 'btn ghost', '选关'); back.type = 'button'; back.addEventListener('click', home);
+  row.appendChild(back);
+  card.appendChild(row);
+  if (G.key.startsWith('daily')){ const sh = el('button', 'btn ghost', '复制成绩'); sh.type = 'button'; sh.addEventListener('click', () => copy(`塞行李箱 每日一箱 ${todayKey().slice(5).replace('-', '月')}日\n🧳 ${fmt(sec)} · ${G.items.length} 件 · 动了 ${G.moves} 次`)); card.appendChild(sh); }
+  setTimeout(() => openModal(card), 500);
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+function copy(t){ const fb = () => { const ta = el('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e){} ta.remove(); }; try { navigator.clipboard.writeText(t).then(() => toast('复制好了'), fb); } catch (e){ fb(); } }
+function openModal(card){ const m = $('modal'); m.replaceChildren(card); m.hidden = false; }
+function closeModal(){ $('modal').hidden = true; }
+function home(){
+  closeModal();
+  G = null;
+  const card = $('homeCard');
+  card.replaceChildren();
+  card.append(el('h1', 'logo', '塞行李箱'), el('p', '', '明天出门，把床上的东西全塞进箱子'));
+  const how = el('ul', 'how');
+  for (const t of ['把东西从床上拖进箱子，格子对上就能放。', '点一下东西：可以转方向；衣服还能叠起来、卷起来，占的地方就小了。', '全塞进去就能合上箱子。猫跳进来的话，点它让它出去。']) how.appendChild(el('li', '', t));
+  card.appendChild(how);
+  const lv = el('div', 'levels');
+  const dk = 'daily' + todayKey(), drec = store.get('rec:' + dk, null);
+  const d = el('button', 'lv daily' + (drec ? ' done' : '')); d.type = 'button';
+  d.append(el('b', '', '📅 每日一箱'), el('span', '', drec ? `今天用了 ${fmt(drec)}` : '每天一个新箱子，所有人同一题'));
+  d.addEventListener('click', () => startLevel({name: '每日一箱', cols: 6, rows: 7, cat: true}, hashStr(dk), dk));
+  lv.appendChild(d);
+  LEVELS.forEach((L, i) => {
+    const rec = store.get('rec:lv' + i, null), open = i === 0 || store.get('rec:lv' + (i - 1), null) != null;
+    const b = el('button', 'lv' + (rec ? ' done' : '')); b.type = 'button';
+    b.append(el('b', '', `${i + 1}. ${L.name}`), el('span', '', rec ? `最快 ${fmt(rec)}` : open ? `${L.cols}×${L.rows} 的箱子` : '先过上一关'));
+    b.disabled = !open;
+    b.addEventListener('click', () => startLevel(L, 1000 + i, 'lv' + i));
+    lv.appendChild(b);
+  });
+  card.appendChild(lv);
+  $('home').hidden = false;
+}
+$('btnBack').addEventListener('click', () => { Sound.click(); home(); });
+
+/* ================= 每一帧 ================= */
+let last = performance.now();
+function loop(now){
+  const dt = Math.min(.05, (now - last) / 1000);
+  last = now;
+  if (G && !G.done && $('modal').hidden && $('home').hidden){ G.t += dt; $('time').textContent = fmt(Math.floor(G.t)); catTick(); }
+  if (G) for (let k = G.fx.length - 1; k >= 0; k--){ const f = G.fx[k]; f.life -= dt; f.vy += 500 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.r += dt * 8; if (f.life <= 0) G.fx.splice(k, 1); }
+  draw(now);
+  requestAnimationFrame(loop);
+}
+
+/* ================= 声音 ================= */
+const Sound = (() => {
+  let ac = null, out, nb;
+  const A = {on: store.get('sound', true) !== false};
+  A.unlock = () => { if (ac){ if (ac.state === 'suspended') ac.resume(); return; } try { ac = new (window.AudioContext || window.webkitAudioContext)(); out = ac.createGain(); out.gain.value = A.on ? .8 : 0; out.connect(ac.destination); nb = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } catch (e){} };
+  const tone = (f, d = .3, g = .12, type = 'sine', t = 0, f2) => { if (!ac || !A.on) return; const t0 = ac.currentTime + t, o = ac.createOscillator(), e = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t0); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d); e.gain.setValueAtTime(.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + .005); e.gain.exponentialRampToValueAtTime(.0001, t0 + d); o.connect(e); e.connect(out); o.start(t0); o.stop(t0 + d + .05); };
+  const noise = (d, g, f1, f2, type = 'bandpass', t = 0) => { if (!ac || !A.on) return; const t0 = ac.currentTime + t, s = ac.createBufferSource(); s.buffer = nb; s.loop = true; const f = ac.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(f1, t0); f.frequency.exponentialRampToValueAtTime(f2, t0 + d); const e = ac.createGain(); e.gain.setValueAtTime(.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + .005); e.gain.exponentialRampToValueAtTime(.0001, t0 + d); s.connect(f); f.connect(e); e.connect(out); s.start(t0); s.stop(t0 + d + .05); };
+  A.pick = () => tone(520, .08, .07, 'triangle', 0, 700);
+  A.drop = () => { tone(300, .12, .12, 'sine', 0, 160); noise(.06, .08, 800, 400, 'lowpass'); };
+  A.nope = () => { tone(220, .12, .1, 'square', 0, 180); tone(180, .15, .08, 'square', .1, 150); };
+  A.fold = () => noise(.18, .1, 1500, 4000);
+  A.click = () => tone(880, .05, .05, 'triangle');
+  A.meow = () => { tone(700, .35, .07, 'sawtooth', 0, 900); tone(900, .25, .05, 'sawtooth', .2, 600); };
+  A.zip = () => { for (let k = 0; k < 14; k++) noise(.03, .12, 3000, 2500, 'highpass', k * .04); tone(160, .15, .2, 'sine', .62, 90); };
+  A.win = () => [523, 659, 784, 1047, 1319].forEach((f, k) => tone(f, .5, .08, 'triangle', k * .09));
+  A.set = v => { A.on = v; store.set('sound', v); if (out) out.gain.value = v ? .8 : 0; };
+  return A;
+})();
+$('btnSound').addEventListener('click', () => { Sound.unlock(); Sound.set(!Sound.on); $('btnSound').textContent = Sound.on ? '🔊' : '🔇'; });
+$('btnSound').textContent = Sound.on ? '🔊' : '🔇';
+
+/* ================= 开机 ================= */
+try { await document.fonts.load('40px "ZCOOL KuaiLe"', '塞行李箱出发旅行指南薯片福每日一箱'); } catch (e){}
+layout();
+home();
+requestAnimationFrame(loop);
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__p = {get G(){ return G; }, startLevel, LEVELS, generate, KINDS, itemCells, canPlace, layoutBed, updateUi, home, shoo, solve(){ for (const it of G.items){ it.s = it.sol.s; it.rot = it.sol.rot; it.place = {gx: it.sol.gx, gy: it.sol.gy}; } layoutBed(); updateUi(); }};
+})();
+</script>
+
+</html>
