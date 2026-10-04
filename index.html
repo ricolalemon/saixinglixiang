@@ -89,9 +89,195 @@ button:focus-visible{outline:3px solid var(--coral);outline-offset:2px}
 <section id="home"><div class="card" id="homeCard"></div></section>
 <div id="modal" hidden></div>
 
+<!--BOARD 五个小游戏共用的每日排行榜（tools/board.html，用 tools/embed-board.mjs 塞进各个游戏）-->
+<style>
+.mb-wrap{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(40,25,20,.5);font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:#33302e;-webkit-user-select:none;user-select:none}
+.mb-card{width:min(380px,100%);max-height:calc(100% - 16px);overflow:auto;border-radius:24px;background:#fffaf3;box-shadow:0 24px 60px rgba(40,20,10,.35);padding:22px 18px 18px;display:flex;flex-direction:column;gap:10px;text-align:center;animation:mb-pop .35s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes mb-pop{from{transform:translateY(14px) scale(.95);opacity:0}}
+.mb-card h2{margin:0;font-family:"ZCOOL KuaiLe","PingFang SC",sans-serif;font-weight:400;font-size:28px;line-height:1.2}
+.mb-sub{margin:0;font-size:12px;color:#7a716a}
+.mb-tabs{display:flex;gap:4px;padding:4px;border-radius:999px;background:#f1e8dc;align-self:center}
+.mb-tabs button{border:0;border-radius:999px;padding:6px 14px;background:transparent;font:inherit;font-weight:700;font-size:13px;color:#7a716a;cursor:pointer}
+.mb-tabs button.on{background:#fff;color:#33302e;box-shadow:0 2px 6px rgba(60,30,10,.12)}
+.mb-mine{margin:0;font-size:14px;font-weight:700;color:#3b9c80;min-height:1.4em}
+.mb-list{display:flex;flex-direction:column;gap:6px;min-height:110px;max-height:50vh;overflow:auto;margin:0 -4px;padding:2px 4px;text-align:left}
+.mb-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 1.5px rgba(60,40,30,.12)}
+.mb-row.me{background:#e6f7f1;box-shadow:inset 0 0 0 2px #5fc7a8}
+.mb-rk{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:"Baloo 2","Noto Sans SC",sans-serif;font-weight:800;font-size:14px;color:#7a716a}
+.mb-rk.g1{background:#ffd54f;color:#7a5200}.mb-rk.g2{background:#dfe3e8;color:#4a5560}.mb-rk.g3{background:#f1c39a;color:#7a3f12}
+.mb-nm{flex:1;min-width:0;font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-sc{flex:none;max-width:52%;text-align:right;font-size:12px;color:#7a716a;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-sc b{display:block;font-family:"Baloo 2","Noto Sans SC",sans-serif;font-weight:800;font-size:15px;color:#33302e}
+.mb-note{margin:0;padding:18px 0;text-align:center;font-size:13px;color:#7a716a}
+.mb-row2{display:flex;gap:8px}
+.mb-row2 > *{flex:1}
+.mb-btn{border:0;border-radius:14px;padding:11px 10px;font:inherit;font-weight:900;font-size:15px;cursor:pointer;background:#fff;color:#33302e;box-shadow:inset 0 0 0 1.5px rgba(60,40,30,.14);-webkit-tap-highlight-color:transparent}
+.mb-btn.main{background:#5fc7a8;color:#fff;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14),0 8px 18px rgba(40,120,100,.3)}
+.mb-btn:active{transform:translateY(2px)}
+.mb-input{width:100%;box-sizing:border-box;border:0;border-radius:14px;padding:12px 14px;font:inherit;font-size:17px;font-weight:700;color:#33302e;background:#fff;box-shadow:inset 0 0 0 2px rgba(60,40,30,.14);outline:none;-webkit-user-select:text;user-select:text}
+.mb-input:focus{box-shadow:inset 0 0 0 2px #5fc7a8}
+.mb-err{min-height:1.2em;margin:0;font-size:12px;color:#ff7a6b}
+</style>
+<script>
+window.MiniBoard = (() => {
+'use strict';
+// Supabase 项目的地址和公开 key（公开 key 本来就是给网页用的，能读榜、能交成绩，改不了别人的）
+const URL0 = 'https://ghjrmmqnajguwkfoplgo.supabase.co', KEY = 'sb_publishable_1YWUN4fZ3c_TjQD9p6Lmlg_K-vDB6y_';
+const PREVIEW = !!window.claude || /(^|\.)claude(usercontent)?\.(ai|com)$/.test(location.hostname);
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('mini:' + k); return v == null ? d : JSON.parse(v); } catch (e){ return d; } },
+  set(k, v){ try { localStorage.setItem('mini:' + k, JSON.stringify(v)); } catch (e){} }
+};
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+// game：哪个游戏；first：一天只算第一局（否则留当天最好的一局）
+let cfg = {game: '', first: false};
+const day = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// 每个人一个只存在自己手机上的编号（交成绩、改名用），和一个公开的短标记（榜上认出自己用）；五个游戏共用一个名字
+function me(){
+  let m = store.get('me', null);
+  if (!m){
+    const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
+    const h = hex(16);
+    m = {pid: `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`, tag: hex(4), name: ''};
+    store.set('me', m);
+  }
+  return m;
+}
+let api = async (path, body) => {
+  const headers = {apikey: KEY, 'Content-Type': 'application/json'};
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(URL0 + '/rest/v1/' + path, body ? {method: 'POST', headers, body: JSON.stringify(body), signal: ctl.signal} : {headers, signal: ctl.signal});
+    if (!r.ok) throw new Error('http ' + r.status);
+    const txt = await r.text();
+    return txt ? JSON.parse(txt) : null;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+const pendKey = board => `pend:${cfg.game}:${board}`, sentKey = board => `sent:${cfg.game}:${board}`;
+const better = (x, y) => x.a > y.a || (x.a === y.a && (x.b || 0) > (y.b || 0));
+// 交成绩：a 越大越好，a 一样比 b；shown 是榜上显示的成绩，extra 是下面一行小字
+function submit(board, sc){
+  const d = day(), p = store.get(pendKey(board), null), sent = store.get(sentKey(board), null);
+  if (cfg.first && ((sent && sent.day === d) || (p && p.day === d))) return;
+  if (p && p.day === d && !better(sc, p)) return;
+  if (sent && sent.day === d && !better(sc, sent)) return;
+  store.set(pendKey(board), {day: d, a: sc.a, b: sc.b || 0, shown: String(sc.shown).slice(0, 40), extra: String(sc.extra || '').slice(0, 60)});
+  flush(board).catch(() => {});
+}
+async function flush(board){
+  const p = store.get(pendKey(board), null), m = me();
+  if (!p || !m.name || PREVIEW) return null;
+  const res = await api('rpc/mini_submit', {p_game: cfg.game, p_board: board, p_day: p.day, p_player: m.pid, p_tag: m.tag, p_name: m.name, p_a: p.a, p_b: p.b, p_shown: p.shown, p_extra: p.extra});
+  store.set(pendKey(board), null);
+  store.set(sentKey(board), {day: p.day, a: p.a, b: p.b});
+  return res;
+}
+const open = card => { close(); const w = el('div', 'mb-wrap'); w.id = 'mbWrap'; w.appendChild(card); w.addEventListener('click', e => { if (e.target === w) close(); }); document.body.appendChild(w); };
+const close = () => { const w = document.getElementById('mbWrap'); if (w) w.remove(); };
+// 打开今天的排行榜。o: {title, sub, empty, tabs: [{id, label}]}（有好几张榜的时候上面放一排切换）
+async function show(board = '', o = {}){
+  const card = el('div', 'mb-card');
+  const mine = el('p', 'mb-mine'), list = el('div', 'mb-list');
+  card.append(el('h2', '', o.title || '今天的排行榜'), el('p', 'mb-sub', o.sub || ''));
+  if (o.tabs){
+    const tabs = el('div', 'mb-tabs');
+    for (const t of o.tabs){
+      const b = el('button', t.id === board ? 'on' : '', t.label);
+      b.type = 'button';
+      b.addEventListener('click', () => { if (t.id !== board) show(t.id, o); });
+      tabs.appendChild(b);
+    }
+    card.appendChild(tabs);
+  }
+  card.append(mine, list);
+  list.appendChild(el('p', 'mb-note', '正在打开排行榜…'));
+  const row = el('div', 'mb-row2');
+  const nm = el('button', 'mb-btn', me().name ? '改名字' : '起个名字');
+  nm.type = 'button';
+  nm.addEventListener('click', () => askName(() => show(board, o)));
+  const cl = el('button', 'mb-btn main', '关闭');
+  cl.type = 'button';
+  cl.addEventListener('click', close);
+  row.append(nm, cl);
+  card.appendChild(row);
+  open(card);
+  if (PREVIEW){ list.replaceChildren(el('p', 'mb-note', '预览里连不上排行榜，到网页版看')); return; }
+  let res = null;
+  try { res = await flush(board); } catch (e){}
+  let rows;
+  try { rows = await api(`mini_scores?select=tag,name,a,b,shown,extra&game=eq.${cfg.game}&board=eq.${encodeURIComponent(board)}&day=eq.${day()}&order=a.desc,b.desc,updated_at.asc&limit=100`); } catch (e){ if (list.isConnected) list.replaceChildren(el('p', 'mb-note', '排行榜没连上，过一会儿再试')); return; }
+  if (!list.isConnected) return;
+  const m = me();
+  list.replaceChildren();
+  if (!rows.length) list.appendChild(el('p', 'mb-note', '今天还没有人上榜，来当第一个'));
+  let myRank = 0;
+  rows.forEach((r, k) => {
+    const isMe = r.tag === m.tag;
+    if (isMe) myRank = k + 1;
+    const d = el('div', 'mb-row' + (isMe ? ' me' : ''));
+    const sc = el('span', 'mb-sc');
+    sc.append(el('b', '', r.shown), document.createTextNode(r.extra || ''));
+    d.append(el('span', 'mb-rk' + (k < 3 ? ' g' + (k + 1) : ''), String(k + 1)), el('span', 'mb-nm', r.name + (isMe ? '（我）' : '')), sc);
+    list.appendChild(d);
+  });
+  const p = store.get(pendKey(board), null);
+  if (myRank) mine.textContent = `你排第 ${myRank} 名，一共 ${rows.length}${rows.length >= 100 ? '+' : ''} 人`;
+  else if (res && res.rank) mine.textContent = `你排第 ${res.rank} 名，一共 ${res.total} 人`;
+  else if (p && p.day === day()) mine.textContent = m.name ? '成绩还没交上去，过一会儿再打开试试' : '起个名字，今天的成绩就能上榜';
+  else if ((store.get(sentKey(board), null) || {}).day === day()) mine.textContent = '你在 100 名以外';
+  else mine.textContent = o.empty || '玩一局就能上榜';
+  if (myRank) setTimeout(() => list.children[myRank - 1]?.scrollIntoView({block: 'nearest'}), 50);
+}
+function askName(then){
+  const card = el('div', 'mb-card');
+  const m = me();
+  card.append(el('h2', '', m.name ? '改个名字' : '起个名字上榜'), el('p', 'mb-sub', '排行榜上显示这个名字，最多 12 个字，几个小游戏共用'));
+  const input = el('input', 'mb-input');
+  input.type = 'text';
+  input.maxLength = 12;
+  input.placeholder = '比如：小游戏大王';
+  input.value = m.name || '';
+  input.autocomplete = 'nickname';
+  input.enterKeyHint = 'done';
+  input.setAttribute('aria-label', '昵称');
+  const err = el('p', 'mb-err');
+  err.setAttribute('role', 'alert');
+  card.append(input, err);
+  const ok = () => {
+    const name = input.value.trim().slice(0, 12);
+    if (!name){ err.textContent = '先起个名字'; input.focus(); return; }
+    const renamed = m.name && m.name !== name;
+    store.set('me', Object.assign(me(), {name}));
+    if (renamed && !PREVIEW) api('rpc/mini_rename', {p_player: m.pid, p_name: name}).catch(() => {});
+    then();
+  };
+  // 回车只算一次：不拦住的话，这一下还会按到下一个弹窗里的按钮
+  input.addEventListener('keydown', e => { e.stopPropagation(); if (e.key !== 'Enter' || e.isComposing) return; e.preventDefault(); ok(); });
+  const row = el('div', 'mb-row2');
+  const skip = el('button', 'mb-btn', m.name ? '不改了' : '先不上榜');
+  skip.type = 'button';
+  skip.addEventListener('click', m.name ? then : close);
+  const go = el('button', 'mb-btn main', '好了');
+  go.type = 'button';
+  go.addEventListener('click', ok);
+  row.append(skip, go);
+  card.appendChild(row);
+  open(card);
+  // 改名的时候旧名字整个选中，直接打字就替换掉
+  setTimeout(() => { input.focus(); input.select(); }, 60);
+}
+const api0 = {init(o){ cfg = Object.assign({first: false}, o); }, submit, show, close, hasName: () => !!me().name};
+if (['localhost', '127.0.0.1'].includes(location.hostname)) api0.mock = fn => { api = fn; };
+return api0;
+})();
+</script>
+<!--/BOARD-->
 <script>
 (async () => {
 'use strict';
+MiniBoard.init({game: 'saixinglixiang', first: true});
 const $ = id => document.getElementById(id);
 const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const TAU = Math.PI * 2;
@@ -614,6 +800,8 @@ function win(){
   const rec = store.get('rec:' + G.key, null);
   const best = rec ? Math.min(rec, sec) : sec;
   store.set('rec:' + G.key, best);
+  // 排行榜：每日一箱只算今天第一次装完的用时，一样快比谁动得少
+  if (G.key.startsWith('daily')) MiniBoard.submit('', {a: -sec, b: -G.moves, shown: fmt(sec), extra: `动了 ${G.moves} 次`});
   const card = el('div', 'card');
   card.append(el('h2', '', '装下了！'), el('div', 'big', fmt(sec)), el('p', 'small', `${G.spec.name} · ${G.items.length} 件东西 · 动了 ${G.moves} 次 · 最快 ${fmt(best)}`));
   const row = el('div', 'row');
@@ -622,6 +810,7 @@ function win(){
   const back = el('button', 'btn ghost', '选关'); back.type = 'button'; back.addEventListener('click', home);
   row.appendChild(back);
   card.appendChild(row);
+  if (G.key.startsWith('daily')){ const lb = el('button', 'btn ghost', '🏆 今日排行榜'); lb.type = 'button'; lb.addEventListener('click', showBoard); card.appendChild(lb); }
   if (G.key.startsWith('daily')){ const sh = el('button', 'btn ghost', '复制成绩'); sh.type = 'button'; sh.addEventListener('click', () => copy(`塞行李箱 每日一箱 ${todayKey().slice(5).replace('-', '月')}日\n🧳 ${fmt(sec)} · ${G.items.length} 件 · 动了 ${G.moves} 次`)); card.appendChild(sh); }
   setTimeout(() => openModal(card), 500);
 }
@@ -629,6 +818,7 @@ const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 function copy(t){ const fb = () => { const ta = el('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e){} ta.remove(); }; try { navigator.clipboard.writeText(t).then(() => toast('复制好了'), fb); } catch (e){ fb(); } }
 function openModal(card){ const m = $('modal'); m.replaceChildren(card); m.hidden = false; }
 function closeModal(){ $('modal').hidden = true; }
+const showBoard = () => MiniBoard.show('', {title: '每日一箱排行榜', sub: `${todayKey().slice(5).replace('-', '月')}日 · 同一只箱子，只算今天第一次装完的用时`, empty: '装完今天的每日一箱就能上榜'});
 function home(){
   closeModal();
   G = null;
@@ -643,6 +833,9 @@ function home(){
   const d = el('button', 'lv daily' + (drec ? ' done' : '')); d.type = 'button';
   d.append(el('b', '', '📅 每日一箱'), el('span', '', drec ? `今天用了 ${fmt(drec)}` : '每天一个新箱子，所有人同一题'));
   d.addEventListener('click', () => startLevel({name: '每日一箱', cols: 6, rows: 7, cat: true}, hashStr(dk), dk));
+  const bb = el('button', 'lv daily'); bb.type = 'button';
+  bb.append(el('b', '', '🏆 今日排行榜'), el('span', '', '每日一箱，比谁装得最快'));
+  bb.addEventListener('click', showBoard);
   lv.appendChild(d);
   LEVELS.forEach((L, i) => {
     const rec = store.get('rec:lv' + i, null), open = i === 0 || store.get('rec:lv' + (i - 1), null) != null;
@@ -652,6 +845,7 @@ function home(){
     b.addEventListener('click', () => startLevel(L, 1000 + i, 'lv' + i));
     lv.appendChild(b);
   });
+  lv.appendChild(bb);
   card.appendChild(lv);
   $('home').hidden = false;
 }
